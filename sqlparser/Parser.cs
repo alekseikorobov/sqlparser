@@ -59,7 +59,7 @@ namespace sqlparser
                     foreach (ParseError error in errors)
                     {
                         sb.AppendFormat("{0} {1}\r\n", error.Message, error.Line);
-                        chekable.addMessage(Code.T0000006, error.Message, error.Line.ToString());
+                        chekable.messages.addMessage(Code.T0000006, error.Message, error.Line.ToString());
                     }
                     Console.WriteLine(sb.ToString());
                     Console.ResetColor();
@@ -84,14 +84,14 @@ namespace sqlparser
                     //gen.GenerateScript(item, out str);
 
                     //varible.Clear();
-                    CheckStatment(path, item.Statements);                    
+                    CheckStatment(path, item.Statements);
                     chekable.clearObjectFromBatche();
                     chekable.PostBatcheChecable();
                 }
                 chekable.clearObjectFromFile();
                 chekable.PostFileChecable();
 
-                foreach (var message in chekable.Messages)
+                foreach (var message in chekable.messages.Messages)
                 {
                     Console.WriteLine(message.MessageInformation);
                 }
@@ -106,7 +106,7 @@ namespace sqlparser
         private void CheckStatment(string path, IList<TSqlStatement> statements)
         {
             foreach (var statement in statements)
-            {                
+            {
                 if (statement is CreateTableStatement)
                 {
                     chekable.getCreateTableStatement(statement as CreateTableStatement);
@@ -195,8 +195,8 @@ namespace sqlparser
                 var j = JObject.FromObject(statement);
                 foreach (var item in ondeleteNode)
                 {
-                    j[item.Key].Parent.Remove();                    
-                }                
+                    j[item.Key].Parent.Remove();
+                }
                 removeall(j);
 
                 JsonSerializerSettings setting = new JsonSerializerSettings();
@@ -223,7 +223,7 @@ namespace sqlparser
             {
                 WalkNode(node, n =>
                 {
-                    
+
 
                     foreach (var item in ondeleteNode)
                     {
