@@ -55,14 +55,14 @@ namespace sqlparser
                 StringBuilder sb = new StringBuilder();
                 if (errors != null && errors.Count > 0)
                 {
-                    Console.ForegroundColor = ConsoleColor.Red;
+                    //Console.ForegroundColor = ConsoleColor.Red;
                     foreach (ParseError error in errors)
                     {
                         sb.AppendFormat("{0} {1}\r\n", error.Message, error.Line);
-                        chekable.messages.addMessage(Code.T0000006, error.Message, error.Line.ToString());
+                        chekable.messages.addMessage(Code.T0000006,null, error.Message, error.Line.ToString());
                     }
-                    Console.WriteLine(sb.ToString());
-                    Console.ResetColor();
+                    //Console.WriteLine(sb.ToString());
+                    //Console.ResetColor();
                 }
 
                 var s = frag as TSqlScript;
@@ -107,9 +107,27 @@ namespace sqlparser
         {
             foreach (var statement in statements)
             {
+                if (statement == null) continue;
+
                 if (statement is CreateTableStatement)
                 {
                     chekable.getCreateTableStatement(statement as CreateTableStatement);
+                }
+                else
+                if (statement is CreateProcedureStatement)
+                {
+                    chekable.getCreateProcedureStatement(statement as CreateProcedureStatement);
+                    CheckStatment(path, (statement as CreateProcedureStatement).StatementList.Statements);
+                    chekable.PostAllStatmentChecable();
+                    chekable.clearObjectFromStatement();
+                }
+                else
+                if (statement is AlterProcedureStatement)
+                {
+                    chekable.getAlterProcedureStatement(statement as AlterProcedureStatement);
+                    CheckStatment(path, (statement as AlterProcedureStatement).StatementList.Statements);
+                    chekable.PostAllStatmentChecable();
+                    chekable.clearObjectFromStatement();
                 }
                 else
                 if (statement is WhileStatement)
@@ -120,6 +138,12 @@ namespace sqlparser
                 if (statement is IfStatement)
                 {
                     var ifStatement = statement as IfStatement;
+                    
+                    if (ifStatement.Predicate is BooleanExpression)
+                    {
+                        chekable.checkedBooleanComparison(ifStatement.Predicate as BooleanExpression);
+                    }
+
                     CheckStatment(path, new[] { ifStatement.ThenStatement });
                     CheckStatment(path, new[] { ifStatement.ElseStatement });
                 }
@@ -159,16 +183,17 @@ namespace sqlparser
                 {
                     chekable.getInsertStatement(statement as InsertStatement);
                 }
-                //else
-                //if (statement is DeclareVariableStatement)
-                //{
-                //}
+                else
+                if (statement is DropTableStatement)
+                {
+                    chekable.getDropTableStatement(statement as DropTableStatement);
+                }
                 else
                 {
                     SaveToFile(path, statement);
                 }
 
-                chekable.clearObjectFromStatement();
+                //chekable.clearObjectFromStatement();
             }
         }
 
