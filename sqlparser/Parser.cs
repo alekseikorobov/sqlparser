@@ -91,12 +91,25 @@ namespace sqlparser
                 chekable.clearObjectFromFile();
                 chekable.PostFileChecable();
 
-                foreach (var message in chekable.messages.Messages)
+                foreach (var message in chekable.messages.Messages.OrderBy(c=>c.Format?.StartLine))
                 {
+                    switch (message.Text.Type)
+                    {
+                        case TypeMessage.Warning:
+                            Console.ForegroundColor = ConsoleColor.Yellow;
+                            break;
+                        case TypeMessage.Error:
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            break;
+                        case TypeMessage.Debug:
+                            Console.ForegroundColor = ConsoleColor.Gray;
+                            break;
+                        default:
+                            break;
+                    }
                     Console.WriteLine(message.MessageInformation);
+                    Console.ResetColor();
                 }
-
-
                 open.Close();
 
                 Console.ReadLine();

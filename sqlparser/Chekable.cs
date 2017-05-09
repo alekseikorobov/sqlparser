@@ -59,12 +59,12 @@ namespace sqlparser
         {            
             Messages.Add(new Message(code, data, format));
         }
-        public void addMessage(String text, TSqlFragment format, params string[] data)
+        public void addMessage(MyTyps text, TSqlFragment format, params string[] data)
         {
             Messages.Add(new Message(text, data, format));
         }
         public List<Message> Messages { get; set; }
-        private string text;
+        private MyTyps text;
 
         public Message(Code code, string[] data, TSqlFragment format)
         {
@@ -72,7 +72,7 @@ namespace sqlparser
             this.Data = data;
             this.Format = format;
         }
-        public Message(String text, string[] data, TSqlFragment format)
+        public Message(MyTyps text, string[] data, TSqlFragment format)
         {
             this.text = text;
             this.Data = data;
@@ -82,13 +82,13 @@ namespace sqlparser
         {
             get
             {
-                string template = string.Format("({0}) {1} Line: {2}", Code.Value, Text,Format?.StartLine);
+                string template = string.Format("({0}) {1} Line: {2}", Code.Value, Text.Message,Format?.StartLine);
                 return string.Format(template, Data);
             }
         }
         public Code? Code { get; set; }
         public string[] Data { get; set; }
-        public string Text
+        public MyTyps Text
         {
             get
             {
@@ -1039,7 +1039,7 @@ namespace sqlparser
             {
                 if (firstColumn.DataType != secondColumn.DataType)
                 {
-                    messages.addMessage("типы для таблиц не равны!",null);
+                    messages.addMessage(new MyTyps("типы для таблиц не равны!",TypeMessage.Error),null);
                 }
             }
         }
