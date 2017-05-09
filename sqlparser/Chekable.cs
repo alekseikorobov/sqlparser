@@ -163,20 +163,6 @@ namespace sqlparser
             return null;
         }
 
-        internal void getCreateProcedureStatement(CreateProcedureStatement createProcedureStatement)
-        {
-            foreach (var param in createProcedureStatement.Parameters)
-            {
-                parametrs.Add(param.VariableName.Value, new ReferCount<ProcedureParameter, int>(param, 0));
-            }
-        }
-        internal void getAlterProcedureStatement(AlterProcedureStatement createProcedureStatement)
-        {
-            foreach (var param in createProcedureStatement.Parameters)
-            {
-                parametrs.Add(param.VariableName.Value, new ReferCount<ProcedureParameter, int>(param, 0));
-            }
-        }
 
         Server server;
         public Chekable()
@@ -364,6 +350,20 @@ namespace sqlparser
 
 
         #region Statements
+        internal void getCreateProcedureStatement(CreateProcedureStatement createProcedureStatement)
+        {
+            foreach (var param in createProcedureStatement.Parameters)
+            {
+                parametrs.Add(param.VariableName.Value, new ReferCount<ProcedureParameter, int>(param, 0));
+            }
+        }
+        internal void getAlterProcedureStatement(AlterProcedureStatement createProcedureStatement)
+        {
+            foreach (var param in createProcedureStatement.Parameters)
+            {
+                parametrs.Add(param.VariableName.Value, new ReferCount<ProcedureParameter, int>(param, 0));
+            }
+        }
 
         internal void getDropTableStatement(DropTableStatement dropTableStatement)
         {
@@ -371,7 +371,7 @@ namespace sqlparser
             {
                 if (item is SchemaObjectName)
                 {
-                    string table = getNameColumn((item as SchemaObjectName).Identifiers);
+                    string table = getNameIdentifiers((item as SchemaObjectName));
                     var compare = compareNull.SingleOrDefault(c => string.Compare(c.Key, table) == 0);
                     if (compare.Key == null)
                     {
@@ -1020,7 +1020,7 @@ namespace sqlparser
 
             if (!column.IsValid)
             {
-                messages.addMessage(Code.T0000027, Expression, getNameColumn(Identifiers));
+                messages.addMessage(Code.T0000027, Expression, getNameIdentifiers(Expression.MultiPartIdentifier));
             }
             if (IsAliasAll && column.Alias == null)
             {
@@ -1121,16 +1121,16 @@ namespace sqlparser
             throw new NotImplementedException();
         }
 
-        private string getNameColumn(IList<Identifier> identifiers)
-        {
-            return string.Join(".", identifiers.Select(c => c.Value));
+        private string getNameIdentifiers(MultiPartIdentifier multiPart)
+        {            
+            return string.Join(".", multiPart.Identifiers .Select(c => c.Value));
         }
         private string getNameTable(TableReference table)
         {
             if (table is NamedTableReference)
             {
                 var named = table as NamedTableReference;
-                return string.Join(".", named.SchemaObject.Identifiers.Select(c => c.Value));
+                return getNameIdentifiers(named.SchemaObject);
             }
             return null;
         }
