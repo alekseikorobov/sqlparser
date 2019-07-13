@@ -1,114 +1,21 @@
 ﻿using Microsoft.SqlServer.Management.Sdk.Sfc;
 using Microsoft.SqlServer.Management.Smo;
 using Microsoft.SqlServer.TransactSql.ScriptDom;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using sqlparser.Modele;
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace sqlparser
 {
-    public class ObjectFromServer
-    {
-
-    }
-    public class Table : ObjectFromServer
-    {
-        public Table()
-        {
-            IsExists = false;
-            Columns = new List<MyColumn>();
-        }
-        public Table(string name) : this()
-        {
-            Name = name;
-        }
-        public bool IsExists { get; set; }
-        string name;
-        public string Name { get { return name; } set { name = value; IsExists = true; } }
-        public List<MyColumn> Columns { get; set; }
-    }
-    public class MyColumn : ObjectFromServer
-    {
-        public MyColumn(Column column)
-        {
-            this.Column = column;
-        }
-        public string FullName
-        {
-            get
-            {
-                return !string.IsNullOrEmpty(Alias) ? Alias + "." + Name : Name;
-            }
-        }
-        public Column Column { get; set; }
-        public string Alias { get; set; }
-        public string Name { get; set; }
-        public bool IsValid { get; internal set; }
-    }
-    public class Message
-    {
-        public Message()
-        {
-            Messages = new List<Message>();
-        }
-        public void addMessage(string code, TSqlFragment format, params string[] data)
-        {
-            Messages.Add(new Message(code, data, format));
-        }
-        //public void addMessage(string text, TSqlFragment format, params string[] data)
-        //{
-        //    Messages.Add(new Message(text, data, format));
-        //}
-        public List<Message> Messages { get; set; }
-
-        public Message(string code, string[] data, TSqlFragment format)
-        {
-            this.Code = code;
-            this.Data = data;
-            this.Format = format;
-        }
-        //public Message(MyTyps text, string[] data, TSqlFragment format)
-        //{
-        //    this.text = text;
-        //    this.Data = data;
-        //    this.Format = format;
-        //}
-        public string MessageInformation
-        {
-            get
-            {
-                //string template = string.Format("({0}) {1} Line: {2}", Code, Text.Message,Format?.StartLine);
-                return string.Format(Code, Data);
-            }
-        }
-        public string Code { get; set; }
-        public string[] Data { get; set; }
-
-        public TSqlFragment Format { get; set; }
-    }
-    public class ReferCount<T1, T2>
-    {
-        public ReferCount(T1 obj, T2 count)
-        {
-            Obj = obj;
-            Count = count;
-        }
-
-        public T1 Obj { get; }
-        public T2 Count { get; set; }
-    }
     public class Chekable
     {
-        Dictionary<string, Table> TableFromServer = new Dictionary<string, Table>();
-        string database = "";
-        string schema = "dbo";
-        string serverName = "RUMSKR90AZ5WD";
-        bool IsAliasAll = true;
-        public Message messages = new Message();
         ObjectFromServer GetObjectFromServer(TSqlFragment type)
         {
             if (type is NamedTableReference)
@@ -152,16 +59,6 @@ namespace sqlparser
             return null;
         }
 
-        internal void FullCheck(CreateTableStatement statement)
-        {
-            throw new NotImplementedException();
-        }
-        internal void FullCheck(CreateProcedureStatement statement)
-        {
-            throw new NotImplementedException();
-        }
-
-        Server server;
         public Chekable()
         {
             server = new Server();
@@ -183,6 +80,14 @@ namespace sqlparser
             }
         }
 
+        #region variable
+        Dictionary<string, Table> TableFromServer = new Dictionary<string, Table>();
+        string database = "";
+        string schema = "dbo";
+        string serverName = "RUMSKR90AZ5WD";
+        bool IsAliasAll = true;
+        public Message messages = new Message();
+        Server server;
         Dictionary<string, ReferCount<DeclareVariableElement, int>> varible
             = new Dictionary<string, ReferCount<DeclareVariableElement, int>>();
 
@@ -208,23 +113,8 @@ namespace sqlparser
 
         Dictionary<string, ReferCount<CommonTableExpression, int>> withTables
             = new Dictionary<string, ReferCount<CommonTableExpression, int>>();
+        #endregion
 
-        internal void clearObjectFromStatement()
-        {
-            IsAliasAll = true;
-            tables.Clear();
-            withTables.Clear();
-            parametrs.Clear();
-        }
-        internal void clearObjectFromFile()
-        {
-            tempTeble.Clear();
-        }
-        internal void clearObjectFromBatche()
-        {
-            varible.Clear();
-            tableVarible.Clear();
-        }
         public void CheckUsengTableVarible()
         {
             foreach (var table in tableVarible)
@@ -255,139 +145,18 @@ namespace sqlparser
                 }
             }
         }
-        private void allChecked(DeclareVariableElement var)
-        {
-            if (var.Value is StringLiteral && var.DataType is SqlDataTypeReference)
-            {
-                StringLiteral stringLiteral = var.Value as StringLiteral;
-                var DataType = var.DataType as SqlDataTypeReference;
-
-                if ((DataType.SqlDataTypeOption == SqlDataTypeOption.NVarChar
-                        || DataType.SqlDataTypeOption == SqlDataTypeOption.VarChar)
-                    && stringLiteral != null && stringLiteral.Value != null
-                    )
-                {
-                    if (string.Compare(DataType.Parameters[0].Value, "max", true) == 0)
-                    {
-                        DataType.Parameters[0].Value = "8000";
-                    }
-                    int len = int.Parse(DataType.Parameters[0].Value);
-                    if (len < stringLiteral.Value.Length)
-                    {
-                        messages.addMessage(Code.T0000002, var, var.VariableName.Value);
-                    }
-                }
-            }
-            if (var.Value is ScalarSubquery)
-            {
-                getScalarSubquery(var.Value as ScalarSubquery);
-            }
-        }
         public void PostFileChecable()
         {
             ///проверка удаления временных таблиц            
-        }
-        internal void PostBatcheChecable()
-        {
-            ///проверка закрытия транзакций
-            ///проверка использвание переменных
-            ///проверка использвание аргументов
-            CheckUsingVariable();
-            CheckUsengTableVarible();
         }
         public void PostAllStatmentChecable()
         {
             CheckUsingVariable();
             CheckUsingParams();
         }
-        private Literal getLiteral(VariableReference variableReference)
-        {
-            var res = getDeclare(variableReference).Value;
-            if (res is Literal)
-            {
-                return res as Literal;
-            }
-            else
-            if (res is BinaryExpression)
-            {
-                res = calculateExpression(res as BinaryExpression);
-                //getBooleanBinaryExpression(res as BinaryExpression);
-            }
-            return res as Literal;
-        }
-        private DeclareVariableElement getDeclare(VariableReference variableReference)
-        {
-            if (string.IsNullOrEmpty(variableReference.Name))
-            {
-                throw new Exception(string.Format("Переменная не определена"));
-            }
-            if (varible.ContainsKey(variableReference.Name))
-            {
-                varible[variableReference.Name].Count++;
-                return varible[variableReference.Name].Obj;
-            }
-            else
-            if (parametrs.ContainsKey(variableReference.Name))
-            {
-                parametrs[variableReference.Name].Count++;
-                return parametrs[variableReference.Name].Obj;
-            }
-            messages.addMessage(Code.T0000004, variableReference, variableReference.Name);
-            return null;
-        }
-        CreateTableStatement getTemptable(string name)
-        {
-            if (!tempTeble.ContainsKey(name))
-            {
-                messages.addMessage(Code.T0000016, null, name);
-                return null;
-            }
 
-            tempTeble[name].Count++;
-            return tempTeble[name].Obj;
-        }
-        bool IsTempTable(string name)
-        {
-            return name.Length > 0 && name[0] == '#'
-                || (name.Length > 1 && name[0] == '#' && name[1] == '#');
-        }
-
-
-        #region Statements
-        internal void getCreateProcedureStatement(CreateProcedureStatement createProcedureStatement)
-        {
-            foreach (var param in createProcedureStatement.Parameters)
-            {
-                parametrs.Add(param.VariableName.Value, new ReferCount<ProcedureParameter, int>(param, 0));
-            }
-        }
-        internal void getAlterProcedureStatement(AlterProcedureStatement createProcedureStatement)
-        {
-            foreach (var param in createProcedureStatement.Parameters)
-            {
-                parametrs.Add(param.VariableName.Value, new ReferCount<ProcedureParameter, int>(param, 0));
-            }
-        }
-
-        internal void getDropTableStatement(DropTableStatement dropTableStatement)
-        {
-            foreach (var item in dropTableStatement.Objects)
-            {
-                if (item is SchemaObjectName)
-                {
-                    string table = getNameIdentifiers((item as SchemaObjectName));
-                    var compare = compareNull.SingleOrDefault(c => string.Compare(c.Key, table) == 0);
-                    if (compare.Key == null)
-                    {
-                        messages.addMessage(Code.T0000044, dropTableStatement, table);
-                    }
-
-                    dropTebles.Add(table, new ReferCount<SchemaObjectName, int>(item, 0));
-                }
-            }
-        }
-
-        public void getCreateTableStatement(CreateTableStatement createTableStatement)
+        #region CheckStatmentRegion
+        public void CheckStatment(CreateTableStatement createTableStatement)
         {
             var ident = createTableStatement.SchemaObjectName.BaseIdentifier.Value;
             if (IsTempTable(ident))
@@ -421,7 +190,7 @@ namespace sqlparser
             }
             //SchemaObjectName
         }
-        public void getDeclareTableVariableStatement(DeclareTableVariableStatement declareTableVar)
+        public void CheckStatment(DeclareTableVariableStatement declareTableVar)
         {
             if (tableVarible.ContainsKey(declareTableVar.Body.VariableName.Value))
             {
@@ -430,7 +199,7 @@ namespace sqlparser
             }
             tableVarible.Add(declareTableVar.Body.VariableName.Value, new ReferCount<DeclareTableVariableBody, int>(declareTableVar.Body, 0));
         }
-        public void getInsertStatement(InsertStatement statement)
+        public void CheckStatment(InsertStatement statement)
         {
             string target = "";
             bool isTargetValidate = false;
@@ -509,9 +278,7 @@ namespace sqlparser
                 }
             }
         }
-
-
-        public void getSetVariableStatement(SetVariableStatement set)
+        public void CheckStatment(SetVariableStatement set)
         {
             var setResult = new SetVariableStatement();
 
@@ -527,20 +294,20 @@ namespace sqlparser
 
             allChecked(var);
         }
-        public void getDeclareVariableStatement(DeclareVariableStatement dec)
+        public void CheckStatment(DeclareVariableStatement dec)
         {
-            foreach (var declar in dec.Declarations)
+            foreach (DeclareVariableElement declar in dec.Declarations)
             {
                 if (varible.ContainsKey(declar.VariableName.Value))
                 {
                     messages.addMessage(Code.T0000003, declar, declar.VariableName.Value);
                     continue;
                 }
-                varible.Add(declar.VariableName.Value, new ReferCount<DeclareVariableElement, int>(CloneObject(declar) as DeclareVariableElement, 0));
+                varible.Add(declar.VariableName.Value, new ReferCount<DeclareVariableElement, int>(declar.CloneObject(), 0));
                 allChecked(declar);
             }
         }
-        public void getSelectStatement(SelectStatement select)
+        public void CheckStatment(SelectStatement select)
         {
             if (select.WithCtesAndXmlNamespaces != null && select.WithCtesAndXmlNamespaces is WithCtesAndXmlNamespaces)
             {
@@ -556,6 +323,182 @@ namespace sqlparser
 
             }
         }
+        private void CheckStatment(IfStatement ifStatement)
+        {
+            if (ifStatement.Predicate is BooleanExpression)
+            {
+                this.checkedBooleanComparison(ifStatement.Predicate as BooleanExpression);
+            }
+
+            CheckStatments(new[] { ifStatement.ThenStatement });
+            CheckStatments(new[] { ifStatement.ElseStatement });
+        }
+        private void CheckStatment(AlterProcedureStatement c)
+        {
+            foreach (var param in c.Parameters)
+            {
+                parametrs.Add(param.VariableName.Value, new ReferCount<ProcedureParameter, int>(param, 0));
+            }
+            CheckStatments((c).StatementList.Statements);
+            this.PostAllStatmentChecable();
+            this.clearObjectFromStatement();
+        }
+        private void CheckStatment(CreateProcedureStatement c)
+        {
+            foreach (var param in c.Parameters)
+            {
+                parametrs.Add(param.VariableName.Value, new ReferCount<ProcedureParameter, int>(param, 0));
+            }
+            CheckStatments(c.StatementList.Statements);
+            this.PostAllStatmentChecable();
+            this.clearObjectFromStatement();
+        }
+        internal void CheckStatment(DropTableStatement dropTableStatement)
+        {
+            foreach (var item in dropTableStatement.Objects)
+            {
+                if (item is SchemaObjectName)
+                {
+                    string table = getNameIdentifiers((item as SchemaObjectName));
+                    var compare = compareNull.SingleOrDefault(c => string.Compare(c.Key, table) == 0);
+                    if (compare.Key == null)
+                    {
+                        messages.addMessage(Code.T0000044, dropTableStatement, table);
+                    }
+
+                    dropTebles.Add(table, new ReferCount<SchemaObjectName, int>(item, 0));
+                }
+            }
+        }
+        #endregion
+
+        public void checkedBooleanComparison(BooleanExpression booleanExpression)
+        {
+            if (booleanExpression is BooleanBinaryExpression)
+            {
+                checkedBooleanComparison((booleanExpression as BooleanBinaryExpression).FirstExpression);
+                checkedBooleanComparison((booleanExpression as BooleanBinaryExpression).SecondExpression);
+            }
+            if (booleanExpression is BooleanComparisonExpression)
+            {
+                checkedBooleanComparisonExpression(booleanExpression as BooleanComparisonExpression);
+            }
+            if (booleanExpression is BooleanIsNullExpression)
+            {
+                checkedBooleanIsNullExpression(booleanExpression as BooleanIsNullExpression);
+            }
+            if (booleanExpression is ExistsPredicate)
+            {
+
+            }
+        }
+
+        internal void clearObjectFromStatement()
+        {
+            IsAliasAll = true;
+            tables.Clear();
+            withTables.Clear();
+            parametrs.Clear();
+        }
+        internal void clearObjectFromFile()
+        {
+            tempTeble.Clear();
+        }
+        internal void clearObjectFromBatche()
+        {
+            varible.Clear();
+            tableVarible.Clear();
+        }
+        private void allChecked(DeclareVariableElement var)
+        {
+            if (var.Value is StringLiteral && var.DataType is SqlDataTypeReference)
+            {
+                StringLiteral stringLiteral = var.Value as StringLiteral;
+                var DataType = var.DataType as SqlDataTypeReference;
+
+                if ((DataType.SqlDataTypeOption == SqlDataTypeOption.NVarChar
+                        || DataType.SqlDataTypeOption == SqlDataTypeOption.VarChar)
+                    && stringLiteral != null && stringLiteral.Value != null
+                    )
+                {
+                    if (string.Compare(DataType.Parameters[0].Value, "max", true) == 0)
+                    {
+                        DataType.Parameters[0].Value = "8000";
+                    }
+                    int len = int.Parse(DataType.Parameters[0].Value);
+                    if (len < stringLiteral.Value.Length)
+                    {
+                        messages.addMessage(Code.T0000002, var, var.VariableName.Value);
+                    }
+                }
+            }
+            if (var.Value is ScalarSubquery)
+            {
+                getScalarSubquery(var.Value as ScalarSubquery);
+            }
+        }
+        internal void PostBatcheChecable()
+        {
+            ///проверка закрытия транзакций
+            ///проверка использвание переменных
+            ///проверка использвание аргументов
+            CheckUsingVariable();
+            CheckUsengTableVarible();
+        }
+        private Literal getLiteral(VariableReference variableReference)
+        {
+            var res = getDeclare(variableReference).Value;
+            if (res is Literal)
+            {
+                return res as Literal;
+            }
+            else
+            if (res is BinaryExpression)
+            {
+                res = calculateExpression(res as BinaryExpression);
+                //getBooleanBinaryExpression(res as BinaryExpression);
+            }
+            return res as Literal;
+        }
+        private DeclareVariableElement getDeclare(VariableReference variableReference)
+        {
+            if (string.IsNullOrEmpty(variableReference.Name))
+            {
+                throw new Exception(string.Format("Переменная не определена"));
+            }
+            if (varible.ContainsKey(variableReference.Name))
+            {
+                varible[variableReference.Name].Count++;
+                return varible[variableReference.Name].Obj;
+            }
+            else
+            if (parametrs.ContainsKey(variableReference.Name))
+            {
+                parametrs[variableReference.Name].Count++;
+                return parametrs[variableReference.Name].Obj;
+            }
+            messages.addMessage(Code.T0000004, variableReference, variableReference.Name);
+            return null;
+        }
+        CreateTableStatement getTemptable(string name)
+        {
+            if (!tempTeble.ContainsKey(name))
+            {
+                messages.addMessage(Code.T0000016, null, name);
+                return null;
+            }
+
+            tempTeble[name].Count++;
+            return tempTeble[name].Obj;
+        }
+        bool IsTempTable(string name)
+        {
+            return name.Length > 0 && name[0] == '#'
+                || (name.Length > 1 && name[0] == '#' && name[1] == '#');
+        }
+
+
+        #region StatementsFunction
         private void addWithTable(CommonTableExpression with)
         {
             string key = with.ExpressionName.Value;
@@ -567,7 +510,6 @@ namespace sqlparser
 
             withTables.Add(key, new ReferCount<CommonTableExpression, int>(with, 0));
         }
-
         private void getQuerySpecification(QuerySpecification Query, bool IsAddTableList = true)
         {
             if (Query.FromClause != null)
@@ -598,7 +540,6 @@ namespace sqlparser
                 checkedBooleanComparison(Query.WhereClause.SearchCondition);
             }
         }
-
         private void CheckeTableReference(TableReference tableReference)
         {
             if (tableReference is QualifiedJoin)
@@ -633,7 +574,6 @@ namespace sqlparser
                 getQuerySpecification(query.QueryExpression as QuerySpecification);
             }
         }
-
         //private void checkedSearchCondition(BooleanExpression searchCondition)
         //{
         //    if (searchCondition is BooleanBinaryExpression)
@@ -858,26 +798,6 @@ namespace sqlparser
 
             return new StringLiteral();
         }
-        public void checkedBooleanComparison(BooleanExpression booleanExpression)
-        {
-            if (booleanExpression is BooleanBinaryExpression)
-            {
-                checkedBooleanComparison((booleanExpression as BooleanBinaryExpression).FirstExpression);
-                checkedBooleanComparison((booleanExpression as BooleanBinaryExpression).SecondExpression);
-            }
-            if (booleanExpression is BooleanComparisonExpression)
-            {
-                checkedBooleanComparisonExpression(booleanExpression as BooleanComparisonExpression);
-            }
-            if (booleanExpression is BooleanIsNullExpression)
-            {
-                checkedBooleanIsNullExpression(booleanExpression as BooleanIsNullExpression);
-            }
-            if (booleanExpression is ExistsPredicate)
-            {
-
-            }
-        }
         void checkedBooleanComparisonExpression(BooleanComparisonExpression search)
         {
             if (search.FirstExpression is ColumnReferenceExpression
@@ -1048,7 +968,6 @@ namespace sqlparser
                 }
             }
         }
-
         private MyColumn checableColumnFromServer(string firstAlias, string firstname)
         {
             MyColumn column = null;
@@ -1097,7 +1016,6 @@ namespace sqlparser
             }
             return column;
         }
-
         private TSqlFragment getTableFromAlias(string alias)
         {
             bool T = tables.ContainsKey(alias);
@@ -1120,12 +1038,10 @@ namespace sqlparser
             }
             return null;
         }
-
         private void getTableServerFromAlias(string firstAlias)
         {
             throw new NotImplementedException();
         }
-
         private string getNameIdentifiers(MultiPartIdentifier multiPart)
         {
             return string.Join(".", multiPart.Identifiers.Select(c => c.Value));
@@ -1139,8 +1055,6 @@ namespace sqlparser
             }
             return null;
         }
-
-
         private string getAliasTable(TableReference table)
         {
             if (table is NamedTableReference)
@@ -1157,10 +1071,6 @@ namespace sqlparser
             }
             return null;
         }
-
-
-
-
         void AddTable(TableReference tableReference)
         {
             string key = getAliasTable(tableReference);
@@ -1176,23 +1086,97 @@ namespace sqlparser
             }
             tables.Add(key, new ReferCount<TableReference, int>(tableReference, 0));
         }
-        public object CloneObject(object obj)
+
+        #region SaveToFileIfNewStatement
+        Dictionary<string, JTokenType> ondeleteNode = new Dictionary<string, JTokenType>()
         {
-            if (obj == null) return null;
-
-            Type t1 = obj.GetType();
-            object ret = Activator.CreateInstance(t1);
-
-            var properties = t1.GetProperties().ToArray();
-            for (int i = 0; i < properties.Length; i++)
+             {"ScriptTokenStream", JTokenType.Array }
+            ,{"StartOffset", JTokenType.Integer }
+            ,{"FragmentLength", JTokenType.Integer }
+            ,{"StartLine", JTokenType.Integer }
+            ,{"StartColumn", JTokenType.Integer }
+            ,{"LastTokenIndex", JTokenType.Integer }
+            ,{"FirstTokenIndex", JTokenType.Integer }
+        };
+        public string outputPath { get; internal set; }
+        public string pathResult { get; internal set; }
+        void SaveToFile(TSqlStatement statement)
+        {
+            string sereal = "";
+            var type = statement.GetType();
+            string name = type.Name;
+            try
             {
-                if (properties[i].SetMethod == null) continue;
-                properties[i].SetValue(
-                        ret,
-                        properties[i].GetValue(obj)
-                    );
+                var j = JObject.FromObject(statement);
+                foreach (var item in ondeleteNode)
+                {
+                    j[item.Key].Parent.Remove();
+                }
+                removeall(j);
+
+                JsonSerializerSettings setting = new JsonSerializerSettings();
+                sereal = j.ToString();
             }
-            return ret;
+            catch (Exception ex)
+            {
+                sereal = string.Format("Exception - {0}\r\n\r\n StackTrace - {1}", ex.Message, ex.StackTrace);
+                name = "_Exception_" + name;
+            }
+            int i = 1;
+            string FullPathResult = "";
+            do
+            {
+                FullPathResult = Path.Combine(pathResult, name + "_" + (i++) + ".json");
+            } while (File.Exists(FullPathResult));
+
+            File.WriteAllText(FullPathResult, outputPath + "\r\n\r\n" + sereal, Encoding.Default);
+        }
+        private void removeall(JObject j)
+        {
+            foreach (var node in j.Values())
+            {
+                WalkNode(node, n =>
+                {
+
+
+                    foreach (var item in ondeleteNode)
+                    {
+                        JToken token = n[item.Key];
+                        if (token != null && token.Type == item.Value)
+                        {
+                            token.Parent.Remove();
+                        }
+                    }
+                });
+            }
+        }
+        #endregion
+
+        public void CheckStatments(IList<TSqlStatement> statements)
+        {
+            foreach (TSqlStatement statement in statements)
+            {
+                if (statement == null) continue;
+
+                switch (statement)
+                {
+                    case CreateTableStatement c: this.CheckStatment(c); break;
+                    case WhileStatement c: CheckStatments(new[] { c.Statement }); break;
+                    case BeginEndBlockStatement c: CheckStatments(c.StatementList.Statements); break;
+                    case CreateProcedureStatement c: CheckStatment(c); break;
+                    case AlterProcedureStatement c: CheckStatment(c); break;
+                    case ProcedureStatementBodyBase c: CheckStatments(c.StatementList.Statements); break;
+                    case IfStatement c: CheckStatment(c); break;
+                    case SetVariableStatement c: this.CheckStatment(c); break;
+                    case DeclareVariableStatement c: this.CheckStatment(c); break;
+                    case DeclareTableVariableStatement c: this.CheckStatment(c); break;
+                    case SelectStatement c: this.CheckStatment(c); break;
+                    case InsertStatement c: this.CheckStatment(c); break;
+                    case DropTableStatement c: this.CheckStatment(c); break;
+                    default: SaveToFile(statement); break;
+                }
+                //chekable.clearObjectFromStatement();
+            }
         }
     }
 }
