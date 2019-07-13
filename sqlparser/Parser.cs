@@ -21,7 +21,7 @@ namespace sqlparser
             set
             {
                 _pathResult = value;
-                Chekable.PathResult = _pathResult;
+                //Chekable.PathResult = _pathResult;
             }
         }
         public Chekable Chekable { get; set; }
@@ -82,8 +82,18 @@ namespace sqlparser
                 //gen.GenerateScript(item, out str);
 
                 //varible.Clear();
-                Chekable.CheckStatments(item.Statements);
-
+                try
+                {
+                    Chekable.CheckStatments(item.Statements);
+                }
+                catch (ExceptionTSqlFragment ex)
+                {
+                    var json = ex.GetJsonString();
+                    string str = $"{ex.NameFile}\r\n{json}";
+                    Console.WriteLine(str);
+                    //Console.WriteLine(ex.Message);
+                    //ex.SaveToFile(this.inputSqlFile, PathResult);
+                }
 
                 Chekable.clearObjectFromBatche();
                 Chekable.PostBatcheChecable();
@@ -113,22 +123,22 @@ namespace sqlparser
             file.Close();
         }
 
-        public void ParserFile(string path)
+        public void ParserFile(string inputSqlFile)
         {
-            this.outputPath = path;
-            Chekable.outputPath = outputPath;
-            using (StreamReader file = File.OpenText(outputPath))
+            this.inputSqlFile = inputSqlFile;
+            //Chekable.outputPath = outputPath;
+            using (StreamReader inputSqlFileStream = File.OpenText(this.inputSqlFile))
             {
-                ParseStream(file);
+                this.ParseStream(inputSqlFileStream);
             }
             Console.ReadLine();
         }
 
 
-        public string outputPath { get; set; }
+        public string inputSqlFile { get; set; }
         private void SaveToFileParseError(string v)
         {
-            string Name = "_ParseError_" + Path.GetFileName(this.outputPath);
+            string Name = "_ParseError_" + Path.GetFileName(this.inputSqlFile);
             int i = 1;
             string FullPathResult = "";
             do
@@ -136,7 +146,7 @@ namespace sqlparser
                 FullPathResult = Path.Combine(PathResult, Name + "_" + (i++) + ".json");
             } while (File.Exists(FullPathResult));
 
-            File.WriteAllText(FullPathResult, this.outputPath + "\r\n\r\n" + v, Encoding.Default);
+            File.WriteAllText(FullPathResult, this.inputSqlFile + "\r\n\r\n" + v, Encoding.Default);
         }
     }
 }

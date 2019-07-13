@@ -67,6 +67,7 @@ namespace sqlparser
             bool isConnect = false;
             try
             {
+                server.ConnectionContext.ConnectTimeout = 1;
                 server.ConnectionContext.Connect();
                 isConnect = true;
             }
@@ -299,7 +300,7 @@ namespace sqlparser
 
             var.Value = setResult.Expression;
 
-            allChecked(var);
+            AllChecked(var);
         }
         public void CheckStatment(DeclareVariableStatement dec)
         {
@@ -311,7 +312,7 @@ namespace sqlparser
                     continue;
                 }
                 varible.Add(declar.VariableName.Value, new ReferCount<DeclareVariableElement, int>(declar.CloneObject(), 0));
-                allChecked(declar);
+                AllChecked(declar);
             }
         }
         public void CheckStatment(SelectStatement select)
@@ -416,35 +417,38 @@ namespace sqlparser
             varible.Clear();
             tableVarible.Clear();
         }
-        private void allChecked(DeclareVariableElement var)
+        private void AllChecked(DeclareVariableElement var)
         {
-            if (var.Value is StringLiteral && var.DataType is SqlDataTypeReference)
+            switch (var.Value)
             {
-                StringLiteral stringLiteral = var.Value as StringLiteral;
-                var DataType = var.DataType as SqlDataTypeReference;
+                case StringLiteral stringLiteral:
+                    {
+                        var DataType = var.DataType as SqlDataTypeReference;
 
-                if ((DataType.SqlDataTypeOption == SqlDataTypeOption.NVarChar
-                        || DataType.SqlDataTypeOption == SqlDataTypeOption.VarChar)
-                    && stringLiteral != null && stringLiteral.Value != null
-                    )
-                {
-                    if (string.Compare(DataType.Parameters[0].Value, "max", true) == 0)
-                    {
-                        DataType.Parameters[0].Value = "8000";
+                        if ((DataType.SqlDataTypeOption == SqlDataTypeOption.NVarChar
+                            || DataType.SqlDataTypeOption == SqlDataTypeOption.VarChar)
+                            && stringLiteral != null
+                            && stringLiteral.Value != null
+                            )
+                        {
+                            if (string.Compare(DataType.Parameters[0].Value, "max", true) == 0)
+                            {
+                                DataType.Parameters[0].Value = "8000";
+                            }
+                            int len = int.Parse(DataType.Parameters[0].Value);
+                            if (len < stringLiteral.Value.Length)
+                            {
+                                string varName = var.VariableName.Value;
+                                string lenVar = len.ToString();
+                                string lenVul = stringLiteral.Value.Length.ToString();
+                                this.AddMessage(Code.T0000002, var, varName, lenVul, lenVar);
+                            }
+                        }
+                        break;
                     }
-                    int len = int.Parse(DataType.Parameters[0].Value);
-                    if (len < stringLiteral.Value.Length)
-                    {
-                        string varName = var.VariableName.Value;
-                        string lenVar = len.ToString();
-                        string lenVul = stringLiteral.Value.Length.ToString();
-                        this.AddMessage(Code.T0000002, var, varName, lenVul, lenVar);
-                    }
-                }
-            }
-            if (var.Value is ScalarSubquery)
-            {
-                getScalarSubquery(var.Value as ScalarSubquery);
+                case ScalarSubquery s: getScalarSubquery(s); break;
+                default:
+                    throw new ExceptionTSqlFragment(var.Value);
             }
         }
         internal void PostBatcheChecable()
@@ -534,14 +538,15 @@ namespace sqlparser
             {
                 if (element is SelectScalarExpression)
                 {
-                    var expression = element as SelectScalarExpression;
-                    if (expression.Expression is VariableReference)
+                    var expression = (element as SelectScalarExpression).Expression;
+                    switch (expression)
                     {
-                        getDeclare(expression.Expression as VariableReference);
-                    }
-                    if (expression.Expression is ColumnReferenceExpression)
-                    {
-                        var myColumn = checkedColumnReference(expression.Expression as ColumnReferenceExpression);
+                        case VariableReference ex: getDeclare(ex); break;
+                        case ColumnReferenceExpression ex: checkedColumnReference(ex); break;
+                        case StringLiteral ex:
+                            break;
+                        default:
+                            throw new ExceptionTSqlFragment(expression);
                     }
                 }
             }
@@ -607,7 +612,6 @@ namespace sqlparser
             }
 
             expr.FirstExpression = convertExpression(expr.FirstExpression);
-
             expr.SecondExpression = convertExpression(expr.SecondExpression);
 
             if (expr.FirstExpression is Literal && expr.SecondExpression is Literal)
@@ -615,11 +619,11 @@ namespace sqlparser
                 if (expr.BinaryExpressionType == BinaryExpressionType.Add)
                 {
                     if (expr.FirstExpression is StringLiteral && expr.SecondExpression is StringLiteral)
-                        return calculate<StringLiteral, string>(expr, (a) => a, (a, b) => { return a + b; });
+                        return Calculate<StringLiteral, string>(expr, (a) => a, (a, b) => { return a + b; });
                     if (expr.FirstExpression is IntegerLiteral && expr.SecondExpression is IntegerLiteral)
-                        return calculate<IntegerLiteral, int>(expr, int.Parse, (a, b) => { return a + b; });
+                        return Calculate<IntegerLiteral, int>(expr, int.Parse, (a, b) => { return a + b; });
                     if (expr.FirstExpression is NumericLiteral && expr.SecondExpression is NumericLiteral)
-                        return calculate<IntegerLiteral, float>(expr, float.Parse, (a, b) => { return a + b; });
+                        return Calculate<IntegerLiteral, float>(expr, float.Parse, (a, b) => { return a + b; });
                 }
                 else
                 {
@@ -629,32 +633,34 @@ namespace sqlparser
                 if (expr.BinaryExpressionType == BinaryExpressionType.Subtract)
                 {
                     if (expr.FirstExpression is IntegerLiteral && expr.SecondExpression is IntegerLiteral)
-                        return calculate<IntegerLiteral, int>(expr, int.Parse, (a, b) => { return a - b; });
+                        return Calculate<IntegerLiteral, int>(expr, int.Parse, (a, b) => { return a - b; });
                     if (expr.FirstExpression is NumericLiteral && expr.SecondExpression is NumericLiteral)
-                        return calculate<IntegerLiteral, float>(expr, float.Parse, (a, b) => { return a - b; });
+                        return Calculate<IntegerLiteral, float>(expr, float.Parse, (a, b) => { return a - b; });
                 }
                 if (expr.BinaryExpressionType == BinaryExpressionType.Multiply)
                 {
                     if (expr.FirstExpression is IntegerLiteral && expr.SecondExpression is IntegerLiteral)
-                        return calculate<IntegerLiteral, int>(expr, int.Parse, (a, b) => { return a * b; });
+                        return Calculate<IntegerLiteral, int>(expr, int.Parse, (a, b) => { return a * b; });
                     if (expr.FirstExpression is NumericLiteral && expr.SecondExpression is NumericLiteral)
-                        return calculate<IntegerLiteral, float>(expr, float.Parse, (a, b) => { return a * b; });
+                        return Calculate<IntegerLiteral, float>(expr, float.Parse, (a, b) => { return a * b; });
                 }
                 if (expr.BinaryExpressionType == BinaryExpressionType.Divide)
                 {
                     if (expr.FirstExpression is IntegerLiteral && expr.SecondExpression is IntegerLiteral)
-                        return calculate<IntegerLiteral, int>(expr, int.Parse, (a, b) => { return a / b; });
+                        return Calculate<IntegerLiteral, int>(expr, int.Parse, (a, b) => { return a / b; });
                     if (expr.FirstExpression is NumericLiteral && expr.SecondExpression is NumericLiteral)
-                        return calculate<IntegerLiteral, float>(expr, float.Parse, (a, b) => { return a / b; });
+                        return Calculate<IntegerLiteral, float>(expr, float.Parse, (a, b) => { return a / b; });
                 }
             }
             return null;
         }
-        T calculate<T, T1>(BinaryExpression val, Func<string, T1> parse, Func<T1, T1, T1> result)
+        T Calculate<T, T1>(BinaryExpression val, Func<string, T1> parse, Func<T1, T1, T1> result)
              where T : Literal, new()
         {
             T res = new T();
-            res.Value = result(parse((val.FirstExpression as Literal).Value), parse((val.SecondExpression as Literal).Value)).ToString();
+            Literal literaFirst = val.FirstExpression as Literal;
+            Literal literalSecond = val.SecondExpression as Literal;
+            res.Value = result(parse(literaFirst.Value), parse(literalSecond.Value)).ToString();
             return res;
         }
         DeclareTableVariableBody getDeclareTableVariable(VariableTableReference vtr)
@@ -697,82 +703,78 @@ namespace sqlparser
         }
         private void getScalarSubquery(ScalarSubquery subquery)
         {
-            if (subquery.QueryExpression is QuerySpecification)
+            switch (subquery.QueryExpression)
             {
-                var queryPart = subquery.QueryExpression as QuerySpecification;
-
-                if (queryPart.TopRowFilter != null)
-                {
-                    var p = queryPart.TopRowFilter.Expression as ParenthesisExpression;
-                    Literal literal = null;
-                    if (p.Expression is VariableReference)
+                case QuerySpecification queryPart:
                     {
-                        literal = getLiteral(p.Expression as VariableReference);
-                    }
-                    else
-                    if (p.Expression is IntegerLiteral)
-                    {
-                        literal = p.Expression as IntegerLiteral;
-                    }
-                    if (literal == null)
-                    {
-                        AddMessage(Code.T0000036, subquery, p.Expression.GetType().Name);
-                    }
-                    else
-                    {
-                        if (int.Parse(literal.Value) != 1)
+                        if (queryPart.TopRowFilter != null)
                         {
-                            AddMessage(Code.T0000035, subquery, literal.Value);
+                            var p = queryPart.TopRowFilter.Expression as ParenthesisExpression;
+                            Literal literal = null;
+                            if (p.Expression is VariableReference)
+                            {
+                                literal = getLiteral(p.Expression as VariableReference);
+                            }
+                            else
+                            if (p.Expression is IntegerLiteral)
+                            {
+                                literal = p.Expression as IntegerLiteral;
+                            }
+                            if (literal == null)
+                            {
+                                AddMessage(Code.T0000036, subquery, p.Expression.GetType().Name);
+                            }
+                            else
+                            {
+                                if (int.Parse(literal.Value) != 1)
+                                {
+                                    AddMessage(Code.T0000035, subquery, literal.Value);
+                                }
+                            }
                         }
+                        else
+                        {
+                            if (queryPart.FromClause != null)
+                                AddMessage(Code.T0000034, subquery);
+                        }
+
+                        if (queryPart.WhereClause == null && queryPart.FromClause != null)
+                        {
+                            AddMessage(Code.T0000037, subquery);
+                        }
+
+                        getQuerySpecification(queryPart);
+
+                        if (queryPart.SelectElements.Count > 1)
+                        {
+                            AddMessage(Code.T0000012, subquery);
+                        }
+                        else
+                        if (queryPart.SelectElements.Count == 1)
+                        {
+                            var el = queryPart.SelectElements[0];
+                            switch (el)
+                            {
+                                case SelectStarExpression el1: AddMessage(Code.T0000013, subquery); break;
+                                case SelectScalarExpression expression1:
+                                    var expression = (el as SelectScalarExpression).Expression;
+                                    switch (expression)
+                                    {
+                                        case Literal ex: break;
+                                        case ColumnReferenceExpression ex: break;
+                                        case VariableReference ex: break;
+                                        case ScalarSubquery ex: getScalarSubquery(ex); break;
+                                        default: throw new ExceptionTSqlFragment(expression);
+                                    }
+                                    break;
+                                default:
+                                    throw new ExceptionTSqlFragment(el);
+                            }
+                        }
+                        break;
                     }
-                }
-                else
-                {
-                    if (queryPart.FromClause != null)
-                        AddMessage(Code.T0000034, subquery);
-                }
-
-                if (queryPart.WhereClause == null && queryPart.FromClause != null)
-                {
-                    AddMessage(Code.T0000037, subquery);
-                }
-
-                getQuerySpecification(queryPart);
-
-                if (queryPart.SelectElements.Count > 1)
-                {
-                    AddMessage(Code.T0000012, subquery);
-                }
-                else
-                if (queryPart.SelectElements.Count == 1)
-                {
-                    var el = queryPart.SelectElements[0];
-                    if (el is SelectStarExpression)
-                    {
-                        AddMessage(Code.T0000013, subquery);
-                        return;
-                    }
-                    if (el is SelectScalarExpression)
-                    {
-                        var expression = (el as SelectScalarExpression).Expression;
-                        if (expression is Literal)
-                        {
-
-                        }
-                        if (expression is ColumnReferenceExpression)
-                        {
-
-                        }
-                        if (expression is VariableReference)
-                        {
-
-                        }
-                        if (expression is ScalarSubquery)
-                        {
-                            getScalarSubquery(expression as ScalarSubquery);
-                        }
-                    }
-                }
+                default:
+                    throw new ExceptionTSqlFragment(subquery.QueryExpression);
             }
         }
         private Literal getConvertOrCast(ScalarExpression secondExpression)
@@ -1097,89 +1099,6 @@ namespace sqlparser
             tables.Add(key, new ReferCount<TableReference, int>(tableReference, 0));
         }
 
-        #region SaveToFileIfNewStatement
-        Dictionary<string, JTokenType> ondeleteNode = new Dictionary<string, JTokenType>()
-        {
-             {"ScriptTokenStream", JTokenType.Array }
-            ,{"StartOffset", JTokenType.Integer }
-            ,{"FragmentLength", JTokenType.Integer }
-            ,{"StartLine", JTokenType.Integer }
-            ,{"StartColumn", JTokenType.Integer }
-            ,{"LastTokenIndex", JTokenType.Integer }
-            ,{"FirstTokenIndex", JTokenType.Integer }
-        };
-        public string outputPath { get; internal set; }
-        public string PathResult { get; internal set; }
-        void SaveToFile(TSqlStatement statement)
-        {
-            string sereal = "";
-            var type = statement.GetType();
-            string name = type.Name;
-            try
-            {
-                var j = JObject.FromObject(statement);
-                foreach (var item in ondeleteNode)
-                {
-                    j[item.Key].Parent.Remove();
-                }
-                removeall(j);
-
-                JsonSerializerSettings setting = new JsonSerializerSettings();
-                sereal = j.ToString();
-            }
-            catch (Exception ex)
-            {
-                sereal = string.Format("Exception - {0}\r\n\r\n StackTrace - {1}", ex.Message, ex.StackTrace);
-                name = "_Exception_" + name;
-            }
-            int i = 1;
-            string FullPathResult = "";
-            do
-            {
-                FullPathResult = Path.Combine(PathResult, name + "_" + (i++) + ".json");
-            } while (File.Exists(FullPathResult));
-
-            File.WriteAllText(FullPathResult, outputPath + "\r\n\r\n" + sereal, Encoding.Default);
-        }
-        private void removeall(JObject j)
-        {
-            foreach (var node in j.Values())
-            {
-                WalkNode(node, n =>
-                {
-
-
-                    foreach (var item in ondeleteNode)
-                    {
-                        JToken token = n[item.Key];
-                        if (token != null && token.Type == item.Value)
-                        {
-                            token.Parent.Remove();
-                        }
-                    }
-                });
-            }
-        }
-        void WalkNode(JToken node, Action<JObject> action)
-        {
-            if (node.Type == JTokenType.Object)
-            {
-                action((JObject)node);
-
-                foreach (JProperty child in node.Children<JProperty>())
-                {
-                    WalkNode(child.Value, action);
-                }
-            }
-            else if (node.Type == JTokenType.Array)
-            {
-                foreach (JToken child in node.Children())
-                {
-                    WalkNode(child, action);
-                }
-            }
-        }
-        #endregion
 
         public void CheckStatments(IList<TSqlStatement> statements)
         {
@@ -1202,9 +1121,8 @@ namespace sqlparser
                     case SelectStatement c: this.CheckStatment(c); break;
                     case InsertStatement c: this.CheckStatment(c); break;
                     case DropTableStatement c: this.CheckStatment(c); break;
-                    default: SaveToFile(statement); break;
+                    default: throw new ExceptionTSqlFragment(statement);
                 }
-                //chekable.clearObjectFromStatement();
             }
         }
     }

@@ -96,6 +96,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Chekable.cs" />
+    <Compile Include="ExceptionTSqlFragment.cs" />
     <Compile Include="types\Message.cs" />
     <Compile Include="Modele\DictionaryMessage.cs" />
     <Compile Include="types\MyColumn.cs" />
