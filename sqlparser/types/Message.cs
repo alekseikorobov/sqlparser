@@ -1,4 +1,5 @@
 ﻿using Microsoft.SqlServer.TransactSql.ScriptDom;
+using System;
 using System.Collections.Generic;
 
 namespace sqlparser
@@ -7,39 +8,40 @@ namespace sqlparser
     {
         public Message()
         {
-            Messages = new List<Message>();
         }
-        public void addMessage(string code, TSqlFragment format, params string[] data)
-        {
-            Messages.Add(new Message(code, data, format));
-        }
-        //public void addMessage(string text, TSqlFragment format, params string[] data)
-        //{
-        //    Messages.Add(new Message(text, data, format));
-        //}
-        public List<Message> Messages { get; set; }
 
-        public Message(string code, string[] data, TSqlFragment format)
+        public Message(string value, string[] data, TSqlFragment format)
         {
-            this.Code = code;
+            this.Value = value ?? throw new System.ArgumentNullException(nameof(value));
             this.Data = data;
             this.Format = format;
+            this.Code = FindCodeByValue(value);
         }
-        //public Message(MyTyps text, string[] data, TSqlFragment format)
-        //{
-        //    this.text = text;
-        //    this.Data = data;
-        //    this.Format = format;
-        //}
+
+        private string FindCodeByValue(string value)
+        {
+            var t = typeof(sqlparser.Modele.Code);
+            var ps = t.GetProperties();
+            foreach (System.Reflection.PropertyInfo propertyInfo in ps)
+            {
+                var val = propertyInfo.GetValue(t);
+                if (val.Equals(value))
+                {
+                    return propertyInfo.Name;
+                }
+            }
+            return "";
+        }
+
         public string MessageInformation
         {
             get
             {
-                //string template = string.Format("({0}) {1} Line: {2}", Code, Text.Message,Format?.StartLine);
-                return string.Format(Code, Data);
+                return string.Format(Value, Data);
             }
         }
         public string Code { get; set; }
+        public string Value { get; set; }
         public string[] Data { get; set; }
 
         public TSqlFragment Format { get; set; }

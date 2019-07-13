@@ -35,7 +35,8 @@ namespace sqlparser
             try
             {
                 //string dic = @"c:\share\data\SQL\";
-                var p = new Parser(pathResult);
+                var p = new Parser();
+                p.PathResult = pathResult;
                 //p.ParserAll(dic);
                 //Parser(@"c:\share\data\SQL\sqlWork\запросы лабы.sql");
                 //Parser(@"c:\share\data\SQL\_SQL\_SQL\my project\COD\Актуальные процедуры.sql");

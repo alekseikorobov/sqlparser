@@ -9,7 +9,7 @@ namespace sqlparser.Modele
     public static class Code
     {
         public static string T0000001 { get; set; } = "Переменная '{0}' ни где не используется ";
-        public static string T0000002 { get; set; } = "Длина меньше чем должна быть для переменной '{0}'";
+        public static string T0000002 { get; set; } = "Длина меньше чем должна быть для переменной '{0}'. Входящие значение - {1}, указанное значение поля {2}";
         public static string T0000003 { get; set; } = "Переменная '{0}' уже объявлена";
         public static string T0000004 { get; set; } = "Переменная '{0}' или не объявлена или отсутствует параметр";
         public static string T0000005 { get; set; } = "Operand data type nvarchar is invalid for '{0}' operator.";

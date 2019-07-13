@@ -46,12 +46,12 @@ namespace sqlparser
                     }
                     else
                     {
-                        messages.addMessage(Code.T0000022, type, fullNameTable, obj.GetType().Name);
+                        AddMessage(Code.T0000022, type, fullNameTable, obj.GetType().Name);
                     }
                 }
                 else
                 {
-                    messages.addMessage(Code.T0000023, type, fullNameTable);
+                    AddMessage(Code.T0000023, type, fullNameTable);
                     TableFromServer.Add(fullNameTable, temptable);
                 }
                 return temptable;
@@ -78,6 +78,7 @@ namespace sqlparser
                 database = conect.Database;
                 schema = server.Databases[database].DefaultSchema;
             }
+            Messages = new List<Message>();
         }
 
         #region variable
@@ -86,7 +87,13 @@ namespace sqlparser
         string schema = "dbo";
         string serverName = "RUMSKR90AZ5WD";
         bool IsAliasAll = true;
-        public Message messages = new Message();
+
+        public List<Message> Messages { get; set; }
+        public void AddMessage(string value, TSqlFragment format, params string[] data)
+        {
+            Messages.Add(new Message(value, data, format));
+        }
+
         Server server;
         Dictionary<string, ReferCount<DeclareVariableElement, int>> varible
             = new Dictionary<string, ReferCount<DeclareVariableElement, int>>();
@@ -121,7 +128,7 @@ namespace sqlparser
             {
                 if (table.Value.Count == 0)
                 {
-                    messages.addMessage(Code.T0000011, table.Value.Obj, table.Key);
+                    AddMessage(Code.T0000011, table.Value.Obj, table.Key);
                 }
             }
         }
@@ -131,7 +138,7 @@ namespace sqlparser
             {
                 if (value.Value.Count == 0)
                 {
-                    messages.addMessage(Code.T0000001, value.Value.Obj, value.Value.Obj.VariableName.Value);
+                    AddMessage(Code.T0000001, value.Value.Obj, value.Value.Obj.VariableName.Value);
                 }
             }
         }
@@ -141,7 +148,7 @@ namespace sqlparser
             {
                 if (parametr.Value.Count == 0)
                 {
-                    messages.addMessage(Code.T0000045, parametr.Value.Obj, parametr.Value.Obj.VariableName.Value);
+                    AddMessage(Code.T0000045, parametr.Value.Obj, parametr.Value.Obj.VariableName.Value);
                 }
             }
         }
@@ -163,7 +170,7 @@ namespace sqlparser
             {
                 if (tempTeble.ContainsKey(ident))
                 {
-                    messages.addMessage(Code.T0000039, createTableStatement, ident);
+                    AddMessage(Code.T0000039, createTableStatement, ident);
                     return;
                 }
                 else
@@ -175,14 +182,14 @@ namespace sqlparser
             {
                 if (createTebles.ContainsKey(ident))
                 {
-                    messages.addMessage(Code.T0000040, createTableStatement, ident);
+                    AddMessage(Code.T0000040, createTableStatement, ident);
                     return;
                 }
                 else
                 {
                     if (!dropTebles.ContainsKey(ident))
                     {
-                        messages.addMessage(Code.T0000041, createTableStatement, ident);
+                        AddMessage(Code.T0000041, createTableStatement, ident);
                     }
 
                     createTebles.Add(ident, new ReferCount<CreateTableStatement, int>(createTableStatement, 0));
@@ -194,7 +201,7 @@ namespace sqlparser
         {
             if (tableVarible.ContainsKey(declareTableVar.Body.VariableName.Value))
             {
-                messages.addMessage(Code.T0000038, declareTableVar, declareTableVar.Body.VariableName.Value);
+                AddMessage(Code.T0000038, declareTableVar, declareTableVar.Body.VariableName.Value);
                 return;
             }
             tableVarible.Add(declareTableVar.Body.VariableName.Value, new ReferCount<DeclareTableVariableBody, int>(declareTableVar.Body, 0));
@@ -226,7 +233,7 @@ namespace sqlparser
             }
             if (statement.InsertSpecification.Columns.Count == 0)
             {
-                messages.addMessage(Code.T0000007, statement, target);
+                AddMessage(Code.T0000007, statement, target);
             }
             if (statement.InsertSpecification.InsertSource is SelectInsertSource)
             {
@@ -234,12 +241,12 @@ namespace sqlparser
                 var query = select.Select as QuerySpecification;
                 if (query.SelectElements.Count > statement.InsertSpecification.Columns.Count)
                 {
-                    messages.addMessage(Code.T0000009, statement, target);
+                    AddMessage(Code.T0000009, statement, target);
                 }
                 else
                 if (query.SelectElements.Count < statement.InsertSpecification.Columns.Count)
                 {
-                    messages.addMessage(Code.T0000010, statement, target);
+                    AddMessage(Code.T0000010, statement, target);
                 }
                 getQuerySpecification(query);
 
@@ -273,7 +280,7 @@ namespace sqlparser
                     }
                     if (element is SelectStarExpression)
                     {
-                        messages.addMessage(Code.T0000008, element, target);
+                        AddMessage(Code.T0000008, element, target);
                     }
                 }
             }
@@ -300,7 +307,7 @@ namespace sqlparser
             {
                 if (varible.ContainsKey(declar.VariableName.Value))
                 {
-                    messages.addMessage(Code.T0000003, declar, declar.VariableName.Value);
+                    AddMessage(Code.T0000003, declar, declar.VariableName.Value);
                     continue;
                 }
                 varible.Add(declar.VariableName.Value, new ReferCount<DeclareVariableElement, int>(declar.CloneObject(), 0));
@@ -363,7 +370,7 @@ namespace sqlparser
                     var compare = compareNull.SingleOrDefault(c => string.Compare(c.Key, table) == 0);
                     if (compare.Key == null)
                     {
-                        messages.addMessage(Code.T0000044, dropTableStatement, table);
+                        AddMessage(Code.T0000044, dropTableStatement, table);
                     }
 
                     dropTebles.Add(table, new ReferCount<SchemaObjectName, int>(item, 0));
@@ -428,7 +435,10 @@ namespace sqlparser
                     int len = int.Parse(DataType.Parameters[0].Value);
                     if (len < stringLiteral.Value.Length)
                     {
-                        messages.addMessage(Code.T0000002, var, var.VariableName.Value);
+                        string varName = var.VariableName.Value;
+                        string lenVar = len.ToString();
+                        string lenVul = stringLiteral.Value.Length.ToString();
+                        this.AddMessage(Code.T0000002, var, varName, lenVul, lenVar);
                     }
                 }
             }
@@ -477,14 +487,14 @@ namespace sqlparser
                 parametrs[variableReference.Name].Count++;
                 return parametrs[variableReference.Name].Obj;
             }
-            messages.addMessage(Code.T0000004, variableReference, variableReference.Name);
+            AddMessage(Code.T0000004, variableReference, variableReference.Name);
             return null;
         }
         CreateTableStatement getTemptable(string name)
         {
             if (!tempTeble.ContainsKey(name))
             {
-                messages.addMessage(Code.T0000016, null, name);
+                AddMessage(Code.T0000016, null, name);
                 return null;
             }
 
@@ -504,7 +514,7 @@ namespace sqlparser
             string key = with.ExpressionName.Value;
             if (withTables.ContainsKey(key))
             {
-                messages.addMessage(Code.T0000018, with, key);
+                AddMessage(Code.T0000018, with, key);
                 return;
             }
 
@@ -614,7 +624,7 @@ namespace sqlparser
                 else
                 {
                     if (expr.FirstExpression is StringLiteral && expr.SecondExpression is StringLiteral)
-                        messages.addMessage(Code.T0000005, expr.FirstExpression, expr.BinaryExpressionType.ToString());
+                        AddMessage(Code.T0000005, expr.FirstExpression, expr.BinaryExpressionType.ToString());
                 }
                 if (expr.BinaryExpressionType == BinaryExpressionType.Subtract)
                 {
@@ -651,7 +661,7 @@ namespace sqlparser
         {
             if (!tableVarible.ContainsKey(vtr.Variable.Name))
             {
-                messages.addMessage(Code.T0000015, vtr, vtr.Variable.Name);
+                AddMessage(Code.T0000015, vtr, vtr.Variable.Name);
                 return null;
             }
             tableVarible[vtr.Variable.Name].Count++;
@@ -706,32 +716,32 @@ namespace sqlparser
                     }
                     if (literal == null)
                     {
-                        messages.addMessage(Code.T0000036, subquery, p.Expression.GetType().Name);
+                        AddMessage(Code.T0000036, subquery, p.Expression.GetType().Name);
                     }
                     else
                     {
                         if (int.Parse(literal.Value) != 1)
                         {
-                            messages.addMessage(Code.T0000035, subquery, literal.Value);
+                            AddMessage(Code.T0000035, subquery, literal.Value);
                         }
                     }
                 }
                 else
                 {
                     if (queryPart.FromClause != null)
-                        messages.addMessage(Code.T0000034, subquery);
+                        AddMessage(Code.T0000034, subquery);
                 }
 
                 if (queryPart.WhereClause == null && queryPart.FromClause != null)
                 {
-                    messages.addMessage(Code.T0000037, subquery);
+                    AddMessage(Code.T0000037, subquery);
                 }
 
                 getQuerySpecification(queryPart);
 
                 if (queryPart.SelectElements.Count > 1)
                 {
-                    messages.addMessage(Code.T0000012, subquery);
+                    AddMessage(Code.T0000012, subquery);
                 }
                 else
                 if (queryPart.SelectElements.Count == 1)
@@ -739,7 +749,7 @@ namespace sqlparser
                     var el = queryPart.SelectElements[0];
                     if (el is SelectStarExpression)
                     {
-                        messages.addMessage(Code.T0000013, subquery);
+                        AddMessage(Code.T0000013, subquery);
                         return;
                     }
                     if (el is SelectScalarExpression)
@@ -816,7 +826,7 @@ namespace sqlparser
                      || (firstColumn.Alias != null && secondColumn.Alias == null))
                     && string.Compare(firstColumn.Name, secondColumn.Name, true) == 0)
                 {
-                    messages.addMessage(Code.T0000031, search, secondColumn.Name);
+                    AddMessage(Code.T0000031, search, secondColumn.Name);
                 }
 
                 if (firstColumn.Alias != null && secondColumn.Alias != null)
@@ -825,13 +835,13 @@ namespace sqlparser
                     && string.Compare(firstColumn.Name, secondColumn.Name, true) == 0
                     )
                     {
-                        messages.addMessage(Code.T0000032, search, firstColumn.Alias);
+                        AddMessage(Code.T0000032, search, firstColumn.Alias);
                     }
                     else
                     if (firstColumn.Alias != null && secondColumn.Alias != null
                         && string.Compare(firstColumn.Alias, secondColumn.Alias, true) == 0)
                     {
-                        messages.addMessage(Code.T0000025, search, firstColumn.Alias);
+                        AddMessage(Code.T0000025, search, firstColumn.Alias);
                     }
                 }
             }
@@ -851,7 +861,7 @@ namespace sqlparser
                         {
                             if (search.ComparisonType == BooleanComparisonType.Equals)
                             {
-                                messages.addMessage(Code.T0000020, search, firstColumn.FullName, search.ComparisonType.ToString());
+                                AddMessage(Code.T0000020, search, firstColumn.FullName, search.ComparisonType.ToString());
                             }
                         }
                     }
@@ -898,7 +908,7 @@ namespace sqlparser
             {
                 var ex = booleanIsNullExpression.Expression as ColumnReferenceExpression;
                 //проверить что поле может принимать значение null, иначе сравнение не корректно
-                //messages.addMessage(Code.T0000021, getNameColumn(ex.MultiPartIdentifier.Identifiers));
+                //addMessage(Code.T0000021, getNameColumn(ex.MultiPartIdentifier.Identifiers));
             }
 
             if (booleanIsNullExpression.Expression is FunctionCall)
@@ -914,7 +924,7 @@ namespace sqlparser
                             if (!(item is StringLiteral))
                             {
                                 isValid = false;
-                                messages.addMessage(Code.T0000042, booleanIsNullExpression);
+                                AddMessage(Code.T0000042, booleanIsNullExpression);
                                 break;
                             }
                         }
@@ -924,7 +934,7 @@ namespace sqlparser
                             string baseIdentifier = getBaseIdentifier(par0);
                             if (string.IsNullOrEmpty(baseIdentifier))
                             {
-                                messages.addMessage(Code.T0000043, booleanIsNullExpression, par0);
+                                AddMessage(Code.T0000043, booleanIsNullExpression, par0);
                                 return;
                             }
                             compareNull.Add(baseIdentifier, new ReferCount<BooleanIsNullExpression, int>(booleanIsNullExpression, 0));
@@ -944,11 +954,11 @@ namespace sqlparser
 
             if (!column.IsValid)
             {
-                messages.addMessage(Code.T0000027, Expression, getNameIdentifiers(Expression.MultiPartIdentifier));
+                AddMessage(Code.T0000027, Expression, getNameIdentifiers(Expression.MultiPartIdentifier));
             }
             if (IsAliasAll && column.Alias == null)
             {
-                messages.addMessage(Code.T0000019, Expression, column.Name);
+                AddMessage(Code.T0000019, Expression, column.Name);
             }
             if (column.IsValid && server.ConnectionContext.IsOpen)
             {
@@ -963,8 +973,8 @@ namespace sqlparser
             {
                 if (firstColumn.DataType != secondColumn.DataType)
                 {
-                    messages.addMessage(Code.T0000046, null);
-                    //messages.addMessage(new MyTyps("типы для таблиц не равны!",TypeMessage.Error),null);
+                    AddMessage(Code.T0000046, null);
+                    //addMessage(new MyTyps("типы для таблиц не равны!",TypeMessage.Error),null);
                 }
             }
         }
@@ -980,13 +990,13 @@ namespace sqlparser
 
                     //if (!table.IsExists)
                     //{
-                    //    messages.addMessage(Code.T0000028, table.Name);
+                    //    addMessage(Code.T0000028, table.Name);
                     //}
 
                     column = table.Columns.SingleOrDefault(c => string.Compare(c.Name, firstname, true) == 0);
                     if (column == null)
                     {
-                        messages.addMessage(Code.T0000029, t, firstname);
+                        AddMessage(Code.T0000029, t, firstname);
                     }
                 }
             }
@@ -1010,9 +1020,9 @@ namespace sqlparser
                 }
                 if (cols.Count > 1)
                 {
-                    messages.addMessage(Code.T0000033, null, firstname);
+                    AddMessage(Code.T0000033, null, firstname);
                 }
-                messages.addMessage(Code.T0000030, null, firstname);
+                AddMessage(Code.T0000030, null, firstname);
             }
             return column;
         }
@@ -1022,7 +1032,7 @@ namespace sqlparser
             bool W = withTables.ContainsKey(alias);
             if (!T && !W)
             {
-                messages.addMessage(Code.T0000014, null, alias);
+                AddMessage(Code.T0000014, null, alias);
             }
             else
             if (T)
@@ -1081,7 +1091,7 @@ namespace sqlparser
             }
             if (tables.ContainsKey(key))
             {
-                messages.addMessage(Code.T0000017, tableReference, key, getNameTable(tables[key].Obj));
+                AddMessage(Code.T0000017, tableReference, key, getNameTable(tables[key].Obj));
                 return;
             }
             tables.Add(key, new ReferCount<TableReference, int>(tableReference, 0));
@@ -1099,7 +1109,7 @@ namespace sqlparser
             ,{"FirstTokenIndex", JTokenType.Integer }
         };
         public string outputPath { get; internal set; }
-        public string pathResult { get; internal set; }
+        public string PathResult { get; internal set; }
         void SaveToFile(TSqlStatement statement)
         {
             string sereal = "";
@@ -1126,7 +1136,7 @@ namespace sqlparser
             string FullPathResult = "";
             do
             {
-                FullPathResult = Path.Combine(pathResult, name + "_" + (i++) + ".json");
+                FullPathResult = Path.Combine(PathResult, name + "_" + (i++) + ".json");
             } while (File.Exists(FullPathResult));
 
             File.WriteAllText(FullPathResult, outputPath + "\r\n\r\n" + sereal, Encoding.Default);
@@ -1148,6 +1158,25 @@ namespace sqlparser
                         }
                     }
                 });
+            }
+        }
+        void WalkNode(JToken node, Action<JObject> action)
+        {
+            if (node.Type == JTokenType.Object)
+            {
+                action((JObject)node);
+
+                foreach (JProperty child in node.Children<JProperty>())
+                {
+                    WalkNode(child.Value, action);
+                }
+            }
+            else if (node.Type == JTokenType.Array)
+            {
+                foreach (JToken child in node.Children())
+                {
+                    WalkNode(child, action);
+                }
             }
         }
         #endregion
