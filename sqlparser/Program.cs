@@ -27,15 +27,15 @@ namespace sqlparser
 {
     class Program
     {
-        private static string pathresult = @"C:\Users\akorobov\Documents\Visual Studio 2015\Projects\sqlparser\sqlparser\types";
+        private static string pathResult = @"C:\Users\akorobov\Documents\Visual Studio 2015\Projects\sqlparser\sqlparser\types";
 
         static void Main(string[] args)
         {
             //string dic = Environment.CurrentDirectory;
             try
             {
-                string dic = @"c:\share\data\SQL\";
-                var p = new Parser(pathresult);
+                //string dic = @"c:\share\data\SQL\";
+                var p = new Parser(pathResult);
                 //p.ParserAll(dic);
                 //Parser(@"c:\share\data\SQL\sqlWork\запросы лабы.sql");
                 //Parser(@"c:\share\data\SQL\_SQL\_SQL\my project\COD\Актуальные процедуры.sql");

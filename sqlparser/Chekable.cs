@@ -55,50 +55,39 @@ namespace sqlparser
         {
             Messages = new List<Message>();
         }
-        public void addMessage(Code code,TSqlFragment format, params string[] data)
-        {            
+        public void addMessage(string code, TSqlFragment format, params string[] data)
+        {
             Messages.Add(new Message(code, data, format));
         }
-        public void addMessage(MyTyps text, TSqlFragment format, params string[] data)
-        {
-            Messages.Add(new Message(text, data, format));
-        }
+        //public void addMessage(string text, TSqlFragment format, params string[] data)
+        //{
+        //    Messages.Add(new Message(text, data, format));
+        //}
         public List<Message> Messages { get; set; }
-        private MyTyps text;
 
-        public Message(Code code, string[] data, TSqlFragment format)
+        public Message(string code, string[] data, TSqlFragment format)
         {
             this.Code = code;
             this.Data = data;
             this.Format = format;
         }
-        public Message(MyTyps text, string[] data, TSqlFragment format)
-        {
-            this.text = text;
-            this.Data = data;
-            this.Format = format;
-        }
+        //public Message(MyTyps text, string[] data, TSqlFragment format)
+        //{
+        //    this.text = text;
+        //    this.Data = data;
+        //    this.Format = format;
+        //}
         public string MessageInformation
         {
             get
             {
-                string template = string.Format("({0}) {1} Line: {2}", Code.Value, Text.Message,Format?.StartLine);
-                return string.Format(template, Data);
+                //string template = string.Format("({0}) {1} Line: {2}", Code, Text.Message,Format?.StartLine);
+                return string.Format(Code, Data);
             }
         }
-        public Code? Code { get; set; }
+        public string Code { get; set; }
         public string[] Data { get; set; }
-        public MyTyps Text
-        {
-            get
-            {
-                return Code.HasValue ? DictionaryMessage.GetMessage(Code.Value) : text;
-            }
-            private set
-            {
-                text = value;
-            }
-        }
+
         public TSqlFragment Format { get; set; }
     }
     public class ReferCount<T1, T2>
@@ -163,14 +152,29 @@ namespace sqlparser
             return null;
         }
 
+        internal void FullCheck(CreateTableStatement statement)
+        {
+            throw new NotImplementedException();
+        }
+        internal void FullCheck(CreateProcedureStatement statement)
+        {
+            throw new NotImplementedException();
+        }
 
         Server server;
         public Chekable()
         {
             server = new Server();
-            server.ConnectionContext.ConnectionString = "data source=(local);initial catalog=master;integrated security=True;application name=master;MultipleActiveResultSets=True";            
-            server.ConnectionContext.Connect();
-            if (server.ConnectionContext.IsOpen)
+            server.ConnectionContext.ConnectionString = "data source=(local);initial catalog=master;integrated security=True;application name=master;MultipleActiveResultSets=True";
+
+            bool isConnect = false;
+            try
+            {
+                server.ConnectionContext.Connect();
+                isConnect = true;
+            }
+            catch { }
+            if (isConnect && server.ConnectionContext.IsOpen)
             {
                 var conect = (server.ConnectionContext.SqlConnectionObject as SqlConnection);
                 serverName = conect.WorkstationId;
@@ -247,7 +251,7 @@ namespace sqlparser
             {
                 if (parametr.Value.Count == 0)
                 {
-                    messages.addMessage(Code.T0000045, parametr.Value.Obj,parametr.Value.Obj.VariableName.Value);
+                    messages.addMessage(Code.T0000045, parametr.Value.Obj, parametr.Value.Obj.VariableName.Value);
                 }
             }
         }
@@ -335,7 +339,7 @@ namespace sqlparser
         {
             if (!tempTeble.ContainsKey(name))
             {
-                messages.addMessage(Code.T0000016,null, name);
+                messages.addMessage(Code.T0000016, null, name);
                 return null;
             }
 
@@ -439,7 +443,7 @@ namespace sqlparser
                 target = getNameTable(Target);
                 if (!IsTempTable(target))
                 {
-                    if(server.ConnectionContext.IsOpen)
+                    if (server.ConnectionContext.IsOpen)
                         table = GetObjectFromServer(Target) as Table;
                 }
                 //columns = getSpecificationTableTarget(Target);
@@ -614,7 +618,7 @@ namespace sqlparser
                 }
                 else
                 {
-                    if(server.ConnectionContext.IsOpen)
+                    if (server.ConnectionContext.IsOpen)
                         GetObjectFromServer(tableReference);
                 }
                 AddTable(tableReference as NamedTableReference);
@@ -1039,7 +1043,8 @@ namespace sqlparser
             {
                 if (firstColumn.DataType != secondColumn.DataType)
                 {
-                    messages.addMessage(new MyTyps("типы для таблиц не равны!",TypeMessage.Error),null);
+                    messages.addMessage(Code.T0000046, null);
+                    //messages.addMessage(new MyTyps("типы для таблиц не равны!",TypeMessage.Error),null);
                 }
             }
         }
@@ -1086,7 +1091,7 @@ namespace sqlparser
                 }
                 if (cols.Count > 1)
                 {
-                    messages.addMessage(Code.T0000033,null, firstname);
+                    messages.addMessage(Code.T0000033, null, firstname);
                 }
                 messages.addMessage(Code.T0000030, null, firstname);
             }
@@ -1122,8 +1127,8 @@ namespace sqlparser
         }
 
         private string getNameIdentifiers(MultiPartIdentifier multiPart)
-        {            
-            return string.Join(".", multiPart.Identifiers .Select(c => c.Value));
+        {
+            return string.Join(".", multiPart.Identifiers.Select(c => c.Value));
         }
         private string getNameTable(TableReference table)
         {

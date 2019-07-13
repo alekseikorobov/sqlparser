@@ -13,22 +13,22 @@ namespace sqlparser
 {
     public class Parser
     {
-        string pathresult = "";
+        string pathResult = "";
         Chekable chekable = new Chekable();
 
         Dictionary<string, JTokenType> ondeleteNode = new Dictionary<string, JTokenType>()
         {
-             {"ScriptTokenStream",JTokenType.Array }
-            ,{"StartOffset",JTokenType.Integer }
-            ,{"FragmentLength",JTokenType.Integer }
-            ,{"StartLine",JTokenType.Integer }
-            ,{"StartColumn",JTokenType.Integer }
-            ,{"LastTokenIndex",JTokenType.Integer }
-            ,{"FirstTokenIndex",JTokenType.Integer }
+             {"ScriptTokenStream", JTokenType.Array }
+            ,{"StartOffset", JTokenType.Integer }
+            ,{"FragmentLength", JTokenType.Integer }
+            ,{"StartLine", JTokenType.Integer }
+            ,{"StartColumn", JTokenType.Integer }
+            ,{"LastTokenIndex", JTokenType.Integer }
+            ,{"FirstTokenIndex", JTokenType.Integer }
         };
         public Parser(string path)
         {
-            pathresult = path;
+            pathResult = path;
         }
 
         public void ParserAll(string dic)
@@ -36,47 +36,44 @@ namespace sqlparser
             foreach (string file in Directory.EnumerateFiles(dic, "*.sql", SearchOption.AllDirectories))
             {
                 Console.WriteLine("path {0}", file);
-                ParserFile(file);
+                this.outputPath = file;
+                ParserFile();
             }
         }
 
-        public void ParserFile(string path)
+        public void ParserFile()
         {
             TSql100Parser t = new TSql100Parser(true);
 
             //using (TextReader sr = new StringReader(""))
             //{
             //}
-            using (StreamReader open = File.OpenText(path))
+            using (StreamReader file = File.OpenText(outputPath))
             {
                 //var ress = GetUsedTablesFromQuery(open.ReadToEnd());
                 IList<ParseError> errors;
-                TSqlFragment frag = t.Parse(open, out errors);
-                StringBuilder sb = new StringBuilder();
-                if (errors != null && errors.Count > 0)
+                TSqlFragment frag = t.Parse(file, out errors);
+                StringBuilder errorsString = new StringBuilder();
+
+                foreach (ParseError error in errors ?? new List<ParseError>())
                 {
-                    //Console.ForegroundColor = ConsoleColor.Red;
-                    foreach (ParseError error in errors)
-                    {
-                        sb.AppendFormat("{0} {1}\r\n", error.Message, error.Line);
-                        chekable.messages.addMessage(Code.T0000006,null, error.Message, error.Line.ToString());
-                    }
-                    //Console.WriteLine(sb.ToString());
-                    //Console.ResetColor();
+                    errorsString.AppendFormat("{0} {1}\r\n", error.Message, error.Line);
+                    chekable.messages.addMessage(Code.T0000006, null, error.Message, error.Line.ToString());
                 }
 
-                var s = frag as TSqlScript;
-                if (sb.Length > 0)
+                var scipt = frag as TSqlScript;
+                if (errorsString.Length > 0)
                 {
-                    SaveToFileParseError(path, sb.ToString());
+                    SaveToFileParseError(errorsString.ToString());
                 }
-                if (s == null)
+                if (scipt == null)
                 {
-                    open.Close();
+                    file.Close();
                     return;
                 }
 
-                foreach (var item in s.Batches)
+                
+                foreach (var item in scipt.Batches)
                 {
                     //SqlScriptGeneratorOptions opt = new SqlScriptGeneratorOptions();
                     //Sql100ScriptGenerator gen = new Sql100ScriptGenerator();
@@ -84,44 +81,51 @@ namespace sqlparser
                     //gen.GenerateScript(item, out str);
 
                     //varible.Clear();
-                    CheckStatment(path, item.Statements);
+                    CheckStatment(item.Statements);
                     chekable.clearObjectFromBatche();
                     chekable.PostBatcheChecable();
                 }
                 chekable.clearObjectFromFile();
                 chekable.PostFileChecable();
 
-                foreach (var message in chekable.messages.Messages.OrderBy(c=>c.Format?.StartLine))
+                foreach (var message in chekable.messages.Messages.OrderBy(c => c.Format?.StartLine))
                 {
-                    switch (message.Text.Type)
-                    {
-                        case TypeMessage.Warning:
-                            Console.ForegroundColor = ConsoleColor.Yellow;
-                            break;
-                        case TypeMessage.Error:
-                            Console.ForegroundColor = ConsoleColor.Red;
-                            break;
-                        case TypeMessage.Debug:
-                            Console.ForegroundColor = ConsoleColor.Gray;
-                            break;
-                        default:
-                            break;
-                    }
+                    //switch (message.Text.Type)
+                    //{
+                    //    case TypeMessage.Warning:
+                    //        Console.ForegroundColor = ConsoleColor.Yellow;
+                    //        break;
+                    //    case TypeMessage.Error:
+                    //        Console.ForegroundColor = ConsoleColor.Red;
+                    //        break;
+                    //    case TypeMessage.Debug:
+                    //        Console.ForegroundColor = ConsoleColor.Gray;
+                    //        break;
+                    //    default:
+                    //        break;
+                    //}
                     Console.WriteLine(message.MessageInformation);
                     Console.ResetColor();
                 }
-                open.Close();
+                file.Close();
 
                 Console.ReadLine();
             }
         }
 
-        private void CheckStatment(string path, IList<TSqlStatement> statements)
+        private void CheckStatment(IList<TSqlStatement> statements)
         {
-            foreach (var statement in statements)
+            foreach (TSqlStatement statement in statements)
             {
                 if (statement == null) continue;
 
+                switch (statement)
+                {
+                    case CreateTableStatement c: chekable.FullCheck(c); break;
+                    case CreateProcedureStatement c: chekable.FullCheck(c); break;
+                    default:
+                        break;
+                }
                 if (statement is CreateTableStatement)
                 {
                     chekable.getCreateTableStatement(statement as CreateTableStatement);
@@ -130,7 +134,7 @@ namespace sqlparser
                 if (statement is CreateProcedureStatement)
                 {
                     chekable.getCreateProcedureStatement(statement as CreateProcedureStatement);
-                    CheckStatment(path, (statement as CreateProcedureStatement).StatementList.Statements);
+                    CheckStatment((statement as CreateProcedureStatement).StatementList.Statements);
                     chekable.PostAllStatmentChecable();
                     chekable.clearObjectFromStatement();
                 }
@@ -138,37 +142,37 @@ namespace sqlparser
                 if (statement is AlterProcedureStatement)
                 {
                     chekable.getAlterProcedureStatement(statement as AlterProcedureStatement);
-                    CheckStatment(path, (statement as AlterProcedureStatement).StatementList.Statements);
+                    CheckStatment((statement as AlterProcedureStatement).StatementList.Statements);
                     chekable.PostAllStatmentChecable();
                     chekable.clearObjectFromStatement();
                 }
                 else
                 if (statement is WhileStatement)
                 {
-                    CheckStatment(path, new[] { (statement as WhileStatement).Statement });
+                    CheckStatment(new[] { (statement as WhileStatement).Statement });
                 }
                 else
                 if (statement is IfStatement)
                 {
                     var ifStatement = statement as IfStatement;
-                    
+
                     if (ifStatement.Predicate is BooleanExpression)
                     {
                         chekable.checkedBooleanComparison(ifStatement.Predicate as BooleanExpression);
                     }
 
-                    CheckStatment(path, new[] { ifStatement.ThenStatement });
-                    CheckStatment(path, new[] { ifStatement.ElseStatement });
+                    CheckStatment(new[] { ifStatement.ThenStatement });
+                    CheckStatment(new[] { ifStatement.ElseStatement });
                 }
                 else
                 if (statement is BeginEndBlockStatement)
                 {
-                    CheckStatment(path, (statement as BeginEndBlockStatement).StatementList.Statements);
+                    CheckStatment((statement as BeginEndBlockStatement).StatementList.Statements);
                 }
                 else
                 if (statement is ProcedureStatementBodyBase)
                 {
-                    CheckStatment(path, (statement as ProcedureStatementBodyBase).StatementList.Statements);
+                    CheckStatment((statement as ProcedureStatementBodyBase).StatementList.Statements);
                 }
                 else
                 if (statement is SetVariableStatement)
@@ -203,27 +207,27 @@ namespace sqlparser
                 }
                 else
                 {
-                    SaveToFile(path, statement);
+                    SaveToFile(statement);
                 }
 
                 //chekable.clearObjectFromStatement();
             }
         }
-
-        private void SaveToFileParseError(string path, string v)
+        public string outputPath { get; set; }
+        private void SaveToFileParseError(string v)
         {
-            string Name = "_ParseError_" + Path.GetFileName(path);
+            string Name = "_ParseError_" + Path.GetFileName(this.outputPath);
             int i = 1;
             string FullPathResult = "";
             do
             {
-                FullPathResult = Path.Combine(pathresult, Name + "_" + (i++) + ".json");
+                FullPathResult = Path.Combine(pathResult, Name + "_" + (i++) + ".json");
             } while (File.Exists(FullPathResult));
 
-            File.WriteAllText(FullPathResult, path + "\r\n\r\n" + v, Encoding.Default);
+            File.WriteAllText(FullPathResult, this.outputPath + "\r\n\r\n" + v, Encoding.Default);
         }
 
-        void SaveToFile(string path, TSqlStatement statement)
+        void SaveToFile(TSqlStatement statement)
         {
             string sereal = "";
             var type = statement.GetType();
@@ -249,10 +253,10 @@ namespace sqlparser
             string FullPathResult = "";
             do
             {
-                FullPathResult = Path.Combine(pathresult, name + "_" + (i++) + ".json");
+                FullPathResult = Path.Combine(pathResult, name + "_" + (i++) + ".json");
             } while (File.Exists(FullPathResult));
 
-            File.WriteAllText(FullPathResult, path + "\r\n\r\n" + sereal, Encoding.Default);
+            File.WriteAllText(FullPathResult, outputPath + "\r\n\r\n" + sereal, Encoding.Default);
         }
 
         private void removeall(JObject j)
