@@ -54,5 +54,6 @@ namespace sqlparser.Modele
         public static string T0000044 { get; set; } = "При удалении объекта '{0}' отсутствует проверка на существование ";
         public static string T0000045 { get; set; } = "Параметр '{0}' нигде не используется";
         public static string T0000046 { get; internal set; } = "Типы для таблиц не равны!";
+        public static string T0000047 { get; internal set; } = "Тип переменной и присваемого значения не равны, тип переменной - {0}, а тип входящего значения {1}";
     }
 }

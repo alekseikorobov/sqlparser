@@ -276,7 +276,7 @@ namespace sqlparser
                         }
                         if (expression is ScalarSubquery)
                         {
-                            getScalarSubquery(expression as ScalarSubquery);
+                            GetScalarSubquery(expression as ScalarSubquery);
                         }
                     }
                     if (element is SelectStarExpression)
@@ -290,17 +290,16 @@ namespace sqlparser
         {
             var setResult = new SetVariableStatement();
 
-            var var = getDeclare(set.Variable);
-
             if (set.Expression is BinaryExpression)
             {
                 set.Expression = calculateExpression(set.Expression as BinaryExpression);
             }
             setResult.Expression = convertExpression(set.Expression);
 
-            var.Value = setResult.Expression;
+            DeclareVariableElement declareVariableElement = this.GetVariableReference(set.Variable);
+            declareVariableElement.Value = setResult.Expression;
 
-            AllChecked(var);
+            DeclareVariableElementChecked(declareVariableElement);
         }
         public void CheckStatment(DeclareVariableStatement dec)
         {
@@ -312,7 +311,7 @@ namespace sqlparser
                     continue;
                 }
                 varible.Add(declar.VariableName.Value, new ReferCount<DeclareVariableElement, int>(declar.CloneObject(), 0));
-                AllChecked(declar);
+                DeclareVariableElementChecked(declar);
             }
         }
         public void CheckStatment(SelectStatement select)
@@ -417,39 +416,77 @@ namespace sqlparser
             varible.Clear();
             tableVarible.Clear();
         }
-        private void AllChecked(DeclareVariableElement var)
+        private void DeclareVariableElementChecked(DeclareVariableElement var)
         {
             switch (var.Value)
             {
-                case StringLiteral stringLiteral:
+                case Literal literal:
                     {
-                        var DataType = var.DataType as SqlDataTypeReference;
-
-                        if ((DataType.SqlDataTypeOption == SqlDataTypeOption.NVarChar
-                            || DataType.SqlDataTypeOption == SqlDataTypeOption.VarChar)
-                            && stringLiteral != null
-                            && stringLiteral.Value != null
-                            )
-                        {
-                            if (string.Compare(DataType.Parameters[0].Value, "max", true) == 0)
-                            {
-                                DataType.Parameters[0].Value = "8000";
-                            }
-                            int len = int.Parse(DataType.Parameters[0].Value);
-                            if (len < stringLiteral.Value.Length)
-                            {
-                                string varName = var.VariableName.Value;
-                                string lenVar = len.ToString();
-                                string lenVul = stringLiteral.Value.Length.ToString();
-                                this.AddMessage(Code.T0000002, var, varName, lenVul, lenVar);
-                            }
-                        }
+                        CheckVariableLiteral(var, literal);
                         break;
                     }
-                case ScalarSubquery s: getScalarSubquery(s); break;
+                case ScalarSubquery s:
+                    Literal literal = GetScalarSubquery(s);
+                    CheckVariableLiteral(var, literal);
+                    break;
+                case CastCall s:
+                    Literal literal1 = getConvertOrCast(s);
+                    CheckVariableLiteral(var, literal1);
+                    break;
                 default:
                     throw new ExceptionTSqlFragment(var.Value);
             }
+        }
+
+        private void CheckVariableLiteral(DeclareVariableElement var, Literal literal)
+        {
+            var DataType = var.DataType as SqlDataTypeReference;
+
+            bool isCheck = CheckTypeDeclareAndValue(DataType, literal.LiteralType);
+            if (!isCheck) return;
+            if ((DataType.SqlDataTypeOption == SqlDataTypeOption.NVarChar
+                || DataType.SqlDataTypeOption == SqlDataTypeOption.VarChar)
+                && literal != null
+                && literal.Value != null
+                )
+            {
+                if (string.Compare(DataType.Parameters[0].Value, "max", true) == 0)
+                {
+                    DataType.Parameters[0].Value = "8000";
+                }
+                int len = int.Parse(DataType.Parameters[0].Value);
+                if (len < literal.Value.Length)
+                {
+                    string varName = var.VariableName.Value;
+                    string lenVar = len.ToString();
+                    string lenVul = literal.Value.Length.ToString();
+                    this.AddMessage(Code.T0000002, var, varName, lenVul, lenVar);
+                }
+            }
+        }
+
+        private bool CheckTypeDeclareAndValue(SqlDataTypeReference dataType, LiteralType literalType)
+        {
+            if (literalType == LiteralType.String
+                && (dataType.SqlDataTypeOption == SqlDataTypeOption.NVarChar
+                || dataType.SqlDataTypeOption == SqlDataTypeOption.VarChar)
+                )
+            {
+                return true;
+            }
+            if (literalType == LiteralType.Integer
+                && (dataType.SqlDataTypeOption == SqlDataTypeOption.Int
+                || dataType.SqlDataTypeOption == SqlDataTypeOption.Decimal
+                || dataType.SqlDataTypeOption == SqlDataTypeOption.Bit
+                || dataType.SqlDataTypeOption == SqlDataTypeOption.Float)
+                )
+            {
+                return true;
+            }
+
+            this.AddMessage(Code.T0000047, dataType, dataType.SqlDataTypeOption.ToString(), literalType.ToString()
+                );
+            return false;
         }
         internal void PostBatcheChecable()
         {
@@ -459,22 +496,19 @@ namespace sqlparser
             CheckUsingVariable();
             CheckUsengTableVarible();
         }
-        private Literal getLiteral(VariableReference variableReference)
+        private Literal GetLiteral(VariableReference variableReference)
         {
-            var res = getDeclare(variableReference).Value;
-            if (res is Literal)
+            var res = GetVariableReference(variableReference).Value;
+            switch (res)
             {
-                return res as Literal;
+                case Literal r: return r;
+                case BinaryExpression r: return calculateExpression(r);
+                default:
+                    break;
             }
-            else
-            if (res is BinaryExpression)
-            {
-                res = calculateExpression(res as BinaryExpression);
-                //getBooleanBinaryExpression(res as BinaryExpression);
-            }
-            return res as Literal;
+            return null;
         }
-        private DeclareVariableElement getDeclare(VariableReference variableReference)
+        private DeclareVariableElement GetVariableReference(VariableReference variableReference)
         {
             if (string.IsNullOrEmpty(variableReference.Name))
             {
@@ -541,7 +575,7 @@ namespace sqlparser
                     var expression = (element as SelectScalarExpression).Expression;
                     switch (expression)
                     {
-                        case VariableReference ex: getDeclare(ex); break;
+                        case VariableReference ex: GetVariableReference(ex); break;
                         case ColumnReferenceExpression ex: checkedColumnReference(ex); break;
                         case StringLiteral ex:
                             break;
@@ -685,7 +719,7 @@ namespace sqlparser
             }
             if (expression is VariableReference)
             {
-                return getLiteral(expression as VariableReference);
+                return GetLiteral(expression as VariableReference);
             }
             if (expression is FunctionCall)
             {
@@ -701,8 +735,9 @@ namespace sqlparser
             }
             return new StringLiteral();
         }
-        private void getScalarSubquery(ScalarSubquery subquery)
+        private Literal GetScalarSubquery(ScalarSubquery subquery)
         {
+            Literal resultLiteral = null;
             switch (subquery.QueryExpression)
             {
                 case QuerySpecification queryPart:
@@ -710,25 +745,25 @@ namespace sqlparser
                         if (queryPart.TopRowFilter != null)
                         {
                             var p = queryPart.TopRowFilter.Expression as ParenthesisExpression;
-                            Literal literal = null;
+                            //Literal literal = null;
                             if (p.Expression is VariableReference)
                             {
-                                literal = getLiteral(p.Expression as VariableReference);
+                                resultLiteral = GetLiteral(p.Expression as VariableReference);
                             }
                             else
                             if (p.Expression is IntegerLiteral)
                             {
-                                literal = p.Expression as IntegerLiteral;
+                                resultLiteral = p.Expression as IntegerLiteral;
                             }
-                            if (literal == null)
+                            if (resultLiteral == null)
                             {
                                 AddMessage(Code.T0000036, subquery, p.Expression.GetType().Name);
                             }
                             else
                             {
-                                if (int.Parse(literal.Value) != 1)
+                                if (int.Parse(resultLiteral.Value) != 1)
                                 {
-                                    AddMessage(Code.T0000035, subquery, literal.Value);
+                                    AddMessage(Code.T0000035, subquery, resultLiteral.Value);
                                 }
                             }
                         }
@@ -743,7 +778,7 @@ namespace sqlparser
                             AddMessage(Code.T0000037, subquery);
                         }
 
-                        getQuerySpecification(queryPart);
+                        //getQuerySpecification(queryPart);
 
                         if (queryPart.SelectElements.Count > 1)
                         {
@@ -760,10 +795,10 @@ namespace sqlparser
                                     var expression = (el as SelectScalarExpression).Expression;
                                     switch (expression)
                                     {
-                                        case Literal ex: break;
+                                        case Literal ex: resultLiteral = ex; break;
                                         case ColumnReferenceExpression ex: break;
                                         case VariableReference ex: break;
-                                        case ScalarSubquery ex: getScalarSubquery(ex); break;
+                                        case ScalarSubquery ex: GetScalarSubquery(ex); break;
                                         default: throw new ExceptionTSqlFragment(expression);
                                     }
                                     break;
@@ -776,6 +811,7 @@ namespace sqlparser
                 default:
                     throw new ExceptionTSqlFragment(subquery.QueryExpression);
             }
+            return resultLiteral;
         }
         private Literal getConvertOrCast(ScalarExpression secondExpression)
         {
@@ -785,7 +821,7 @@ namespace sqlparser
 
             if (castCall.Parameter is VariableReference)
             {
-                castCall.Parameter = getLiteral(castCall.Parameter as VariableReference);
+                castCall.Parameter = GetLiteral(castCall.Parameter as VariableReference);
             }
 
             StringLiteral sl = new StringLiteral();
@@ -794,9 +830,7 @@ namespace sqlparser
                 var DataType = castCall.DataType as SqlDataTypeReference;
                 if (DataType.SqlDataTypeOption == SqlDataTypeOption.NVarChar || DataType.SqlDataTypeOption == SqlDataTypeOption.VarChar)
                 {
-                    if (castCall.Parameter is IntegerLiteral
-                        //||
-                        )
+                    if (castCall.Parameter is IntegerLiteral)
                     {
                         sl.Value = (castCall.Parameter as Literal).Value;
                     }
