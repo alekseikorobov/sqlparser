@@ -420,9 +420,9 @@ namespace sqlparser
         {
             switch (var.Value)
             {
-                case Literal literal:
+                case Literal literalLocal:
                     {
-                        CheckVariableLiteral(var, literal);
+                        CheckVariableLiteral(var, literalLocal);
                         break;
                     }
                 case ScalarSubquery s:
